@@ -1,3 +1,4 @@
+from postgres_lock import AsyncLock
 from postgres_lock import Lock
 from postgres_lock import errors
 
@@ -139,10 +140,10 @@ def test_acquire__locked_not_shared(_load_impl):
 @mark.asyncio
 @patch(f"{PATH}.Lock._load_impl")
 async def test_acquire_async__defaults(_load_impl):
-    lock = Lock(None, "key")
+    lock = AsyncLock(None, "key")
     lock.impl.acquire_async = AsyncMock()
 
-    assert lock.impl.acquire_async.return_value == await lock.acquire_async()
+    assert lock.impl.acquire_async.return_value == await lock.acquire()
 
     lock.impl.acquire_async.assert_called_with(lock, block=True)
 
@@ -154,10 +155,10 @@ async def test_acquire_async__defaults(_load_impl):
 @mark.parametrize("block", [True, False])
 @patch(f"{PATH}.Lock._load_impl")
 async def test_acquire_async__block(_load_impl, block):
-    lock = Lock(None, "key")
+    lock = AsyncLock(None, "key")
     lock.impl.acquire_async = AsyncMock()
 
-    assert lock.impl.acquire_async.return_value == await lock.acquire_async(block=block)
+    assert lock.impl.acquire_async.return_value == await lock.acquire(block=block)
 
     lock.impl.acquire_async.assert_called_with(lock, block=block)
 
@@ -168,13 +169,13 @@ async def test_acquire_async__block(_load_impl, block):
 @mark.asyncio
 @patch(f"{PATH}.Lock._load_impl")
 async def test_acquire_async__locked_not_shared(_load_impl):
-    lock = Lock(None, "key")
+    lock = AsyncLock(None, "key")
     lock.impl.acquire_async = AsyncMock()
 
-    await lock.acquire_async()
+    await lock.acquire()
 
     with raises(errors.AcquireError) as exc:
-        await lock.acquire_async()
+        await lock.acquire()
 
     assert (
         str(exc.value)
@@ -211,7 +212,7 @@ def test_context_manager__raises_exception(_load_impl):
 @mark.asyncio
 @patch(f"{PATH}.Lock._load_impl")
 async def test_context_manager_async(_load_impl):
-    lock = Lock(None, "key")
+    lock = AsyncLock(None, "key")
     lock.impl.acquire_async = AsyncMock()
     lock.impl.release_async = AsyncMock()
 
@@ -225,7 +226,7 @@ async def test_context_manager_async(_load_impl):
 @mark.asyncio
 @patch(f"{PATH}.Lock._load_impl")
 async def test_context_manager_async__raises_exception(_load_impl):
-    lock = Lock(None, "key")
+    lock = AsyncLock(None, "key")
     lock.impl.acquire_async = AsyncMock()
     lock.impl.handle_error_async = AsyncMock()
     lock.impl.release_async = AsyncMock()
@@ -254,13 +255,11 @@ def test_handle_error(_load_impl):
 @mark.asyncio
 @patch(f"{PATH}.Lock._load_impl")
 async def test_handle_error_async(_load_impl):
-    lock = Lock(None, "key")
+    lock = AsyncLock(None, "key")
     lock.impl.handle_error_async = AsyncMock()
     exc = Exception()
 
-    assert lock.impl.handle_error_async.return_value == await lock.handle_error_async(
-        exc
-    )
+    assert lock.impl.handle_error_async.return_value == await lock.handle_error(exc)
 
     lock.impl.handle_error_async.assert_called_with(lock, exc)
 
@@ -325,12 +324,12 @@ def test_release__not_released(_load_impl):
 @mark.asyncio
 @patch(f"{PATH}.Lock._load_impl")
 async def test_release_async(_load_impl):
-    lock = Lock(None, "key")
+    lock = AsyncLock(None, "key")
     lock._locked = True
     lock._ref_count = 1
     lock.impl.release_async = AsyncMock(return_value=True)
 
-    assert await lock.release_async()
+    assert await lock.release()
     assert lock._ref_count == 0
     assert not lock._locked
 
@@ -338,21 +337,21 @@ async def test_release_async(_load_impl):
 @mark.asyncio
 @patch(f"{PATH}.Lock._load_impl")
 async def test_release_async__not_locked(_load_impl):
-    lock = Lock(None, "key")
+    lock = AsyncLock(None, "key")
 
-    assert not await lock.release_async()
+    assert not await lock.release()
 
 
 @mark.asyncio
 @patch(f"{PATH}.Lock._load_impl")
 async def test_release_async__not_released(_load_impl):
-    lock = Lock(None, "key")
+    lock = AsyncLock(None, "key")
     lock._locked = True
     lock._ref_count = 1
     lock.impl.release_async = AsyncMock(return_value=False)
 
     with raises(errors.ReleaseError) as exc:
-        await lock.release_async()
+        await lock.release()
 
     assert lock._ref_count == 1
     assert (

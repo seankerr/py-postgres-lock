@@ -131,26 +131,6 @@ class Lock:
 
         return self._locked
 
-    async def acquire_async(self, block: bool = True) -> bool:
-        """
-        Acquire the lock asynchronously.
-
-        Parameters:
-            block (bool): Return only once the lock has been acquired.
-
-        Returns:
-            bool: True, if the lock was acquired, otherwise False.
-        """
-        if self._locked and not self._shared:
-            raise errors.AcquireError(
-                f"Lock for '{self.key}' is already held by this {self.scope} scope"
-            )
-
-        self._locked = await self.impl.acquire_async(self, block=block)
-        self._ref_count += 1
-
-        return self._locked
-
     def handle_error(self, exc: BaseException) -> None:
         """
         Handle an error.
@@ -159,15 +139,6 @@ class Lock:
             exc (Exception): Exception.
         """
         return self.impl.handle_error(self, exc)
-
-    async def handle_error_async(self, exc: BaseException) -> None:
-        """
-        Handle an error asynchronously.
-
-        Parameters:
-            exc (Exception): Exception.
-        """
-        return await self.impl.handle_error_async(self, exc)
 
     @property
     def locked(self) -> bool:
@@ -215,32 +186,6 @@ class Lock:
 
         return not self._locked
 
-    async def release_async(self) -> bool:
-        """
-        Release the lock asynchronously.
-
-        When using shared locks, all references to the lock within the current scope must be
-        released before this method will return True.
-
-        Raises:
-            errors.ReleaseError: An attempt to release the lock failed.
-
-        Returns:
-            bool: True, if the lock was released, otherwise False.
-        """
-        if not self._locked:
-            return False
-
-        if not await self.impl.release_async(self):
-            raise errors.ReleaseError(
-                f"Lock for '{self.key}' was not held by this {self.scope} scope"
-            )
-
-        self._ref_count -= 1
-        self._locked = self._ref_count > 0
-
-        return not self._locked
-
     @property
     def shared(self) -> bool:
         """
@@ -250,12 +195,6 @@ class Lock:
             bool: Shared status.
         """
         return self._shared
-
-    async def __aenter__(self) -> bool:
-        """
-        Enter the context manager.
-        """
-        return await self.impl.acquire_async(self, block=True)
 
     def _load_impl(self) -> ModuleType:
         """
@@ -295,28 +234,6 @@ class Lock:
             raise errors.UnsupportedInterfaceError(
                 f"Unsupported database interface '{interface}'"
             )
-
-    async def __aexit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> None:
-        """
-        Exit the context manager.
-
-        Parameters:
-            Exception type (Type[BaseException]): Type of exception that was raised.
-            Exception (BaseException): Exception that was raised.
-            Traceback (TracebackType): Traceback.
-        """
-        if exc:
-            await self.impl.handle_error_async(self, exc)
-
-        await self.impl.release_async(self)
-
-        if exc:
-            raise exc
 
     def __enter__(self) -> bool:
         """
