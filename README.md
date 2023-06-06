@@ -38,11 +38,11 @@ acquire the lock at a time.
 
 ### Usage
 
-All work revolves around the `Lock` class.
+All work revolves around the `Lock` and `AsyncLock` classes.
 
-The easiest way to use `Lock` is with `with` or `async with` statements. The lock will be
-released automatically. If `rollback_on_error` is enabled (default), rollbacks are automatically
-handled prior to release.
+The easiest way to use `Lock` or `AsyncLock` is with `with` or `async with` statements. The lock
+will be released automatically. If `rollback_on_error` is enabled (default), rollbacks are
+automatically handled prior to the lock being released.
 
 _Using `with` and `async with` implies blocking mode._
 
@@ -54,9 +54,8 @@ conn = ...
 
 # create and use lock
 with Lock(conn, "shared-identifier"):
-    print("Acquired lock!")
-
     # do something here
+    pass
 ```
 
 Now compare the above example to the equivalent try/finally example below:
@@ -73,8 +72,6 @@ lock = Lock(conn, "shared-identifier")
 try:
     # acquire lock
     lock.acquire()
-
-    print("Acquired lock!")
 
     try:
         # do something here
@@ -93,32 +90,30 @@ finally:
 ### Asynchronous usage (without `async with`)
 
 ```python
-from postgres_lock import Lock
+from postgres_lock import AsyncLock
 
 # setup connection
 conn = ...
 
 # create lock
-lock = Lock(conn, "shared-identifier")
+lock = AsyncLock(conn, "shared-identifier")
 
 try:
     # acquire lock
-    await lock.acquire_async()
-
-    print("Acquired lock!")
+    await lock.acquire()
 
     try:
         # do something here
         pass
 
     except Exception as exc:
-        # handle_error_async() will rollback the transaction by default
-        await lock.handle_error_async(exc)
+        # handle_error() will rollback the transaction by default
+        await lock.handle_error(exc)
 
         raise exc
 finally:
     # release lock (this is safe to run even if the lock has not been acquired)
-    await lock.release_async()
+    await lock.release()
 ```
 
 ### Non-blocking mode (supports async as well)
@@ -153,8 +148,8 @@ from postgres_lock import Lock
 # setup connection
 conn = ...
 
-# create and use lock
-lock = Lock(conn, "shared-identifier", interface="asyncpg")
+# create
+lock = Lock(conn, "shared-identifier", interface="sqlalchemy")
 
 # do things with the lock
 ```
@@ -175,6 +170,8 @@ lock = Lock(conn, "shared-identifier", rollback_on_error=False)
 
 ### Changelog
 
+- **0.1.3**
+  - Add AsyncLock and rename \*\_async() so they match the Lock methods
 - **0.1.2**
   - Add Lock.rollback_on_error (default true)
   - Add Lock.handle_error() & Lock.handle_error_async()
